@@ -12,7 +12,7 @@ use crate::{
         render::{get_camera_position, set_camera_position, set_light_direction},
         systems::{self, CallList, SystemValue},
     }, objects::{
-        character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, master_instanced_model_onbject::MasterInstancedModelObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, Object
+        character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, Object
     }
 };
 use ez_al::SoundSourceType;

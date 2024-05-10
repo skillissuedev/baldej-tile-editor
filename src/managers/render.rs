@@ -463,9 +463,9 @@ static mut RENDER_RAYS: Vec<RenderRay> = vec![];
 static mut RAY_SHADER: Option<Program> = None;
 static mut COLLIDER_CUBOID_SHADER: Option<Program> = None;
 
-static mut INSTANCED_POSITIONS: Lazy<HashMap<String, Vec<SetupMatrixResult>>> = Lazy::new(|| HashMap::new());
+static mut INSTANCED_POSITIONS: Lazy<HashMap<String, Vec<Mat4>>> = Lazy::new(|| HashMap::new());
 
-pub fn add_instance_position(instance: &str, position: SetupMatrixResult) {
+pub fn add_instance_position(instance: &str, position: Mat4) {
     unsafe {
         match INSTANCED_POSITIONS.get_mut(instance) {
             Some(positions) => positions.push(position),
@@ -476,7 +476,18 @@ pub fn add_instance_position(instance: &str, position: SetupMatrixResult) {
     }
 }
 
-pub fn get_instance_positions(instance: &str) -> Option<&Vec<SetupMatrixResult>> {
+pub fn add_instance_positions_vec(instance: &str, positions: &Vec<Mat4>) {
+    unsafe {
+        match INSTANCED_POSITIONS.get_mut(instance) {
+            Some(instanced_positions) => instanced_positions.extend(positions.iter()),
+            None => {
+                INSTANCED_POSITIONS.insert(instance.into(), positions.to_owned());
+            },
+        }
+    }
+}
+
+pub fn get_instance_positions(instance: &str) -> Option<&Vec<Mat4>> {
     unsafe {
         match INSTANCED_POSITIONS.get(instance) {
             Some(positions) => Some(positions),

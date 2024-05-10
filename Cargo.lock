@@ -176,6 +176,7 @@ dependencies = [
  "mlua",
  "nalgebra",
  "once_cell",
+ "rand",
  "rapier3d",
  "renet",
  "serde",

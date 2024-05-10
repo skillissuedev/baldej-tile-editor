@@ -17,7 +17,8 @@ pub mod character_controller;
 pub mod empty_object;
 pub mod model_object;
 pub mod instanced_model_object;
-pub mod master_instanced_model_onbject;
+pub mod master_instanced_model_object;
+pub mod instanced_model_transform_holder;
 pub mod nav_obstacle;
 pub mod navmesh;
 pub mod ray;
@@ -226,7 +227,6 @@ pub trait Object: std::fmt::Debug + Downcast {
 
     fn add_child(&mut self, mut object: Box<dyn Object>) {
         object.set_parent_transform(self.global_transform());
-        dbg!(object.object_id());
         self.children_list_mut().push(object);
         self.children_list_mut().last_mut().unwrap().start();
     }

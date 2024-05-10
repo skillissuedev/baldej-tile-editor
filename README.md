@@ -6,7 +6,7 @@ WASD to move, RMB/Return to place the selected prop, Z to undo.
 - [x] camera movement
 - [x] loading tiles, props
 - [x] placing props
-- [ ] randomly place instanced details like grass/small stones
+- [x] randomly place instanced details like grass/small stones
 - [ ] generating code to use inside the game
 # Output(pseudocode):
 ```

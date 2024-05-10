@@ -1,11 +1,12 @@
 use super::System;
 use crate::{
-    assets::{model_asset::ModelAsset, shader_asset::ShaderAsset, texture_asset::{TextureAsset, TextureAssetError}}, framework::{self, get_delta_time, get_resolution, set_global_system_value}, managers::{
+    assets::{model_asset::ModelAsset, shader_asset::{ShaderAsset, ShaderAssetPath}, texture_asset::{TextureAsset, TextureAssetError}}, framework::{self, get_delta_time, get_resolution, set_global_system_value}, managers::{
         input::{self, is_mouse_locked, set_mouse_locked, InputEventType}, networking::Message, physics::{BodyColliderType, BodyType}, render::{get_camera_front, get_camera_position, get_camera_right, get_camera_rotation, set_camera_position, set_camera_rotation, set_light_direction}, systems::{CallList, SystemValue}
-    }, objects::{master_instanced_model_onbject::CurrentAnimationSettings, model_object::ModelObject, ray::Ray, Object}
+    }, objects::{instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelPositionHolder, master_instanced_model_object::{CurrentAnimationSettings, MasterInstancedModelObject}, model_object::ModelObject, ray::Ray, Object, Transform}
 };
 use egui_glium::egui_winit::egui::{Color32, ComboBox, Image, Pos2, TextureId, Window};
-use glam::Vec3;
+use glam::{Vec2, Vec3};
+use rand::{thread_rng, Rng};
 use rapier3d::parry::utils::Array1;
 
 #[derive(Debug)]
@@ -25,8 +26,17 @@ pub struct MainSystem {
     new_prop_name: String,
     current_prop: String,
     props_list: Vec<Prop>,
-    last_added_objects_names: Vec<String>,
-    prop_count: usize
+    last_actions: Vec<Action>,
+    prop_count: usize,
+    randomly_place_quantity: String,
+    area_center: Vec2,
+    area_size: Vec2
+}
+
+#[derive(Debug, Clone)]
+enum Action {
+    NewModelObject(String),
+    NewInstancedObjects(String),
 }
 
 impl MainSystem {
@@ -41,8 +51,11 @@ impl MainSystem {
             new_prop_name: String::new(),
             current_prop: String::new(),
             props_list: Vec::new(),
-            last_added_objects_names: Vec::new(),
-            prop_count: 0
+            last_actions: Vec::new(),
+            prop_count: 0,
+            randomly_place_quantity: String::new(),
+            area_center: Vec2::ZERO,
+            area_size: Vec2::new(200.0, 200.0),
         }
     }
 }
@@ -110,6 +123,77 @@ impl System for MainSystem {
 
                 if let Some(i) = i {
                     self.props_list.remove(i);
+                }
+            }
+
+            ui.horizontal(|ui| {
+                ui.label("quantity:");
+                ui.text_edit_singleline(&mut self.randomly_place_quantity);
+            });
+
+            /*
+             *  to do someday :)
+            ui.horizontal(|ui| {
+                ui.label("placement area center:");
+                ui.text_edit_singleline(&mut self.area_center);
+            });
+            ui.horizontal(|ui| {
+                ui.label("placement area size:");
+                ui.text_edit_singleline(&mut self.area_size);
+            });*/
+            if ui.button("randomly place").clicked() {
+                if let Ok(quantity) = self.randomly_place_quantity.parse::<usize>() {
+                    let mut current_prop = None;
+                    for prop in &self.props_list {
+                        if prop.name == self.current_prop {
+                            current_prop = Some(prop)
+                        }
+                    }
+
+                    if let Some(current_prop) = current_prop {
+                        let model_asset = ModelAsset::from_gltf(&current_prop.model_path);
+                        if let Ok(model_asset) = model_asset {
+                            let texture_asset = TextureAsset::from_file(&current_prop.texture_path);
+                            /*let shader_asset = ShaderAsset::load_default_instanced_shader().unwrap();*/
+                            let shader_asset = ShaderAsset::load_from_file(ShaderAssetPath { 
+                                vertex_shader_path: "shaders/default_instanced.vert".into(), fragment_shader_path: "shaders/grass.frag".into() })
+                                .unwrap();
+                            let master_instance_name = format!("{}_master", current_prop.name);
+                            let master_instance;
+                            match texture_asset {
+                                Ok(texture_asset) =>
+                                    master_instance = MasterInstancedModelObject::new(&master_instance_name, model_asset, Some(texture_asset), shader_asset),
+                                Err(_) => 
+                                    master_instance = MasterInstancedModelObject::new(&master_instance_name, model_asset, None, shader_asset),
+                            }
+
+                            let mut instances = Vec::new();
+                            let mut ray = Ray::new("instance_placer_ray", Vec3::new(0.0, -900.0, 0.0), None);
+                            for _ in 0..=quantity {
+                                let min_x = self.area_center.x - self.area_size.x / 2.0;
+                                let max_x = self.area_center.x + self.area_size.x / 2.0;
+                                let min_z = self.area_center.y - self.area_size.y / 2.0;
+                                let max_z = self.area_center.y + self.area_size.y / 2.0;
+                                let x = thread_rng().gen_range(min_x..max_x);
+                                let z = thread_rng().gen_range(min_z..max_z);
+                                ray.set_position(Vec3::new(x, 500.0, z), false);
+                                if let Some(position) = ray.intersection_position() {
+                                    instances.push(Transform {
+                                        position,
+                                        rotation: Default::default(),
+                                        scale: Vec3::ONE,
+                                    });
+                                }
+                            }
+                            let prop_name = current_prop.name.clone();
+                            self.last_actions.push(Action::NewInstancedObjects(prop_name.clone()));
+
+                            let tile = self.find_object_mut("tile").unwrap();
+                            tile.add_child(Box::new(master_instance));
+                            let positions_holder = InstancedModelPositionHolder::new(&format!("{}_holder", prop_name), &master_instance_name, instances);
+                            self.add_object(Box::new(positions_holder))
+                        }
+                    }
                 }
             }
 
@@ -260,10 +344,11 @@ impl System for MainSystem {
                         let mut prop;
                         match texture_asset {
                             Ok(texture_asset) =>
-                                prop = ModelObject::new(&format!("prop{}", self.prop_count), model_asset, Some(texture_asset), ShaderAsset::load_default_shader().unwrap()),
-                            Err(_) => prop = ModelObject::new(&format!("prop{}", self.prop_count), model_asset, None, ShaderAsset::load_default_shader().unwrap()),
+                                prop = ModelObject::new(&format!("prop{}", self.prop_count), model_asset.clone(), Some(texture_asset), ShaderAsset::load_default_shader().unwrap()),
+                            Err(_) => prop = ModelObject::new(&format!("prop{}", self.prop_count), model_asset.clone(), None, ShaderAsset::load_default_shader().unwrap()),
                         }
-                        self.last_added_objects_names.push(prop.name().into());
+                        self.last_actions.push(Action::NewModelObject(prop.name().into()));
+                        prop.build_object_rigid_body(Some(BodyType::Fixed(Some(BodyColliderType::TriangleMesh(model_asset)))), None, 1.0, None, None);
                         prop.set_position(pos, true);
                         self.find_object_mut("tile").unwrap().add_child(Box::new(prop));
                     }
@@ -271,11 +356,20 @@ impl System for MainSystem {
             }
         }
         if input::is_bind_pressed("undo") {
-            if self.last_added_objects_names.len() > 0 {
-                dbg!(&self.last_added_objects_names);
-                let idx = self.last_added_objects_names.len() - 1;
-                self.delete_object(self.last_added_objects_names[idx].clone().as_str());
-                self.last_added_objects_names.remove(idx);
+            if self.last_actions.len() > 0 {
+                dbg!(&self.last_actions);
+                let idx = self.last_actions.len() - 1;
+                match &self.last_actions[idx].clone() {
+                    Action::NewModelObject(name) => {
+                        self.delete_object(&name);
+                        self.last_actions.remove(idx);
+                    },
+                    Action::NewInstancedObjects(name) => {
+                        self.delete_object(&format!("{}_master", name));
+                        self.delete_object(&format!("{}_holder", name));
+                        self.last_actions.remove(idx);
+                    },
+                }
             }
         }
     }

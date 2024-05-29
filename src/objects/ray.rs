@@ -164,7 +164,7 @@ impl Ray {
         );
 
         match get_ray_intersaction_position(ray, toi, query_filter) {
-            Some(pos) => Some(Vec3::new(-pos.x, pos.y, -pos.z)),
+            Some(pos) => Some(Vec3::new(-pos.x, pos.y, pos.z)),
             None => None,
         }
     }

@@ -1,19 +1,19 @@
 use super::System;
 use crate::{
-    assets::{model_asset::ModelAsset, shader_asset::{ShaderAsset, ShaderAssetPath}, texture_asset::{TextureAsset, TextureAssetError}}, framework::{self, get_delta_time, get_resolution, set_global_system_value}, managers::{
+    assets::{model_asset::ModelAsset, shader_asset::{ShaderAsset, ShaderAssetPath}, texture_asset::TextureAsset}, framework::{get_delta_time, get_resolution}, managers::{
         input::{self, is_mouse_locked, set_mouse_locked, InputEventType}, networking::Message, physics::{BodyColliderType, BodyType}, render::{get_camera_front, get_camera_position, get_camera_right, get_camera_rotation, set_camera_position, set_camera_rotation, set_light_direction}, systems::{CallList, SystemValue}
-    }, objects::{instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelPositionHolder, master_instanced_model_object::{CurrentAnimationSettings, MasterInstancedModelObject}, model_object::ModelObject, ray::Ray, Object, Transform}
+    }, objects::{instanced_model_transform_holder::InstancedModelPositionHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, ray::Ray, Object, Transform}
 };
-use egui_glium::egui_winit::egui::{Color32, ComboBox, Image, Pos2, TextureId, Window};
-use glam::{Vec2, Vec3};
+use egui_glium::egui_winit::egui::{Color32, ComboBox, Pos2, ScrollArea, TextEdit, Vec2, Window};
+use glam::Vec3;
 use rand::{thread_rng, Rng};
-use rapier3d::parry::utils::Array1;
 
 #[derive(Debug)]
 struct Prop {
     name: String,
     model_path: String,
-    texture_path: String
+    texture_path: String,
+    instances: Vec<Transform>
 }
 
 pub struct MainSystem {
@@ -35,7 +35,10 @@ pub struct MainSystem {
 
 #[derive(Debug, Clone)]
 enum Action {
-    NewModelObject(String),
+    NewModelObject {
+        object_name: String,
+        prop_name: String
+    },
     NewInstancedObjects(String),
 }
 
@@ -62,6 +65,86 @@ impl MainSystem {
 
 impl System for MainSystem {
     fn ui_render(&mut self, ctx: &egui_glium::egui_winit::egui::Context) {
+        let screen_center = get_resolution() / 2.0;
+        ctx.debug_painter().circle(Pos2::new(screen_center.x, screen_center.y), 3.0, Color32::WHITE, (1.0, Color32::WHITE));
+
+        let transforms_part_list: Vec<String> = self.props_list.iter().map(|prop| {
+            let mut result = format!("const PROP_{}_TRANSFORMS = vec![", prop.name);
+            for instance in &prop.instances {
+                let pos = instance.position;
+                let rot = instance.rotation;
+                let sc = instance.scale;
+
+                result.push_str(
+                    &format!(
+                        "\nTransform {{ position: Vec3::new({}, {}, {}), rotation: Vec3::new({}, {}, {}), scale: Vec3::new({}, {}, {}) }}",
+                        pos.x, pos.y, pos.z, rot.x, rot.y, rot.z, sc.x, sc.y, sc.z,
+                    )
+                );
+            }
+            result.push_str("\n];");
+            result
+        }).collect();
+        dbg!(transforms_part_list);
+
+
+        Window::new("generated code").show(ctx, |ui| {
+            ui.heading("generated code:");
+            ScrollArea::vertical().show(ui, |ui| {
+            ui.add(TextEdit::multiline(&mut "const PROP_NAME_TRANSFORMS = vec![
+    Transform { position: .., rotation: .., scale: .. },
+    Transform { position: .., rotation: .., scale: .. },
+    ...
+];
+
+fn spawn_tile_server(&mut self, position: Vec3) {
+    let tile_model_asset = ModelAsset::new(\"path_here\");
+    let tile = EmptyObject::new(/*using our assets here*/);
+    tile.set_position(position);
+    tile.build_object_body(/*build the trimesh static thing here*/);
+
+
+    // USING TILE AS A PARENT!
+    for prop_transform in PROP_NAME_TRANSFORMS {
+        new_prop_name_server(tile, prop_transform);
+    }
+    // and do the similar thing for all of the props
+    self.add_object(tile);
+}
+
+fn spawn_tile_client(&mut self, position: Vec3) {
+    let tile_model_asset = ModelAsset::new(\"path_here\");
+    let tile_texture_asset = TextureAsset::new(\"path_here\");
+    let tile = Box::new(ModelObject::new(/*using our assets here*/));
+    tile.set_position(position);
+    // maybe build a body here?
+
+
+    let prop_name_model = ModelAsset::new(\"path\");
+    let prop_name_texture = ModelAsset::new(\"path\");
+    // USING TILE AS A PARENT!
+    for prop_transform in PROP_NAME_TRANSFORMS {
+        new_prop_name_client(tile, prop_transform,
+            prop_name_model.clone, prop_name_texture
+        );
+    }
+    // and do the similar thing for all of the props
+}
+
+fn new_prop_name_server(tile: &mut Box<Object>, transform: Transform) {
+    // so spawn the object here, i guess?
+    tile.add_child(Box::new(prop));
+}
+
+fn new_prop_name_client(tile: &mut Box<Object>, transform: Transform, model: ModelAsset, texture: TextureAsset) {
+    let prop = ModelObject::new(model, texture);
+    prop.set_transform(transform);
+    // so spawn the object here, i guess?
+    tile.add_child(Box::new(prop));
+}").code_editor().desired_rows(20).desired_width(f32::INFINITY));
+            });
+        });
+
         Window::new("editor").show(ctx, |ui| {
             ui.label("use the RMB/Return to place the selected prop, Z to undo");
             ui.separator();
@@ -110,6 +193,7 @@ impl System for MainSystem {
                     name: self.new_prop_name.clone(),
                     model_path: self.new_prop_path.clone(),
                     texture_path: self.new_prop_texture.clone(),
+                    instances: Vec::new()
                 });
             }
 
@@ -205,8 +289,6 @@ impl System for MainSystem {
                 }
             });
         });
-        let screen_center = get_resolution() / 2.0;
-        ctx.debug_painter().circle(Pos2::new(screen_center.x, screen_center.y), 3.0, Color32::WHITE, (1.0, Color32::WHITE));
     }
 
     fn client_start(&mut self) {
@@ -281,7 +363,7 @@ impl System for MainSystem {
 
         let camera_front = get_camera_front();
         let camera_right = get_camera_right();
-        let camera_position = get_camera_position();
+        let mut camera_position = get_camera_position();
 
         if input::is_bind_down("cam_up") {
             set_camera_position(Vec3::new(
@@ -289,6 +371,7 @@ impl System for MainSystem {
                 camera_position.y + speed,
                 camera_position.z,
             ));
+            camera_position = get_camera_position();
         }
 
         if input::is_bind_down("cam_down") {
@@ -297,22 +380,27 @@ impl System for MainSystem {
                 camera_position.y - speed,
                 camera_position.z,
             ));
+            camera_position = get_camera_position();
         }
 
         if input::is_bind_down("forward") {
             set_camera_position(camera_position + camera_front * speed);
+            camera_position = get_camera_position();
         }
 
         if input::is_bind_down("backwards") {
             set_camera_position(camera_position - camera_front * speed);
+            camera_position = get_camera_position();
         }
 
         if input::is_bind_down("left") {
             set_camera_position(camera_position - camera_right * speed);
+            camera_position = get_camera_position();
         }
 
         if input::is_bind_down("right") {
             set_camera_position(camera_position + camera_right * speed);
+            camera_position = get_camera_position();
         }
         if get_camera_rotation().x > 89.0 {
             let rot = get_camera_rotation();
@@ -331,11 +419,12 @@ impl System for MainSystem {
             // placing props
             if input::is_bind_pressed("place_prop") {
                 let mut current_prop = None;
-                for prop in &self.props_list {
+                for prop in &mut self.props_list {
                     if prop.name == self.current_prop {
                         current_prop = Some(prop)
                     }
                 }
+
                 if let Some(current_prop) = current_prop {
                     let model_asset = ModelAsset::from_gltf(&current_prop.model_path);
                     if let Ok(model_asset) = model_asset {
@@ -347,22 +436,36 @@ impl System for MainSystem {
                                 prop = ModelObject::new(&format!("prop{}", self.prop_count), model_asset.clone(), Some(texture_asset), ShaderAsset::load_default_shader().unwrap()),
                             Err(_) => prop = ModelObject::new(&format!("prop{}", self.prop_count), model_asset.clone(), None, ShaderAsset::load_default_shader().unwrap()),
                         }
-                        self.last_actions.push(Action::NewModelObject(prop.name().into()));
+                        self.last_actions.push(Action::NewModelObject {
+                            object_name: prop.name().into(),
+                            prop_name: current_prop.name.clone()
+                        });
                         prop.build_object_rigid_body(Some(BodyType::Fixed(Some(BodyColliderType::TriangleMesh(model_asset)))), None, 1.0, None, None);
                         prop.set_position(pos, true);
-                        self.find_object_mut("tile").unwrap().add_child(Box::new(prop));
+                        current_prop.instances.push(prop.local_transform());
+                        self.add_object(Box::new(prop));
                     }
                 }
             }
         }
         if input::is_bind_pressed("undo") {
             if self.last_actions.len() > 0 {
-                dbg!(&self.last_actions);
                 let idx = self.last_actions.len() - 1;
                 match &self.last_actions[idx].clone() {
-                    Action::NewModelObject(name) => {
-                        self.delete_object(&name);
-                        self.last_actions.remove(idx);
+                    Action::NewModelObject { object_name, prop_name } => {
+                        let object = self.find_object(&object_name);
+                        if let Some(object) = object {
+                            let transform = object.local_transform();
+
+                            for prop in &mut self.props_list {
+                                if prop.name == *prop_name {
+                                    prop.instances.retain(|x| *x != transform);
+                                    self.delete_object(&object_name);
+                                    self.last_actions.remove(idx);
+                                    return
+                                }
+                            }
+                        }
                     },
                     Action::NewInstancedObjects(name) => {
                         self.delete_object(&format!("{}_master", name));

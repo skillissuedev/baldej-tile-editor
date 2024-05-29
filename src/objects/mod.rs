@@ -234,6 +234,14 @@ pub trait Object: std::fmt::Debug + Downcast {
     fn delete_child(&mut self, name: &str) {
         for (idx, object) in self.children_list_mut().iter_mut().enumerate() {
             if object.name() == name {
+                if let Some(body_parameters) = object.body_parameters() {
+                    if let Some(handle) = body_parameters.rigid_body_handle {
+                        physics::remove_rigid_body_by_handle(handle);
+                    }
+                    if let Some(handle) = body_parameters.collider_handle {
+                        physics::remove_collider_by_handle(handle);
+                    }
+                }
                 self.children_list_mut().remove(idx);
                 return;
             }
@@ -290,7 +298,7 @@ pub trait Object: std::fmt::Debug + Downcast {
 
 impl_downcast!(Object);
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct Transform {
     pub position: Vec3,
     pub rotation: Vec3,

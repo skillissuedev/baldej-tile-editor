@@ -44,7 +44,8 @@ impl InstancedModelObject {
         let global_transform = &self.global_transform();
 
         let rotation_vector = deg_vec_to_rad(global_transform.rotation);
-        let translation_vector = global_transform.position;
+        let mut translation_vector = global_transform.position;
+        translation_vector.z = -translation_vector.z;
         let scale_vector = global_transform.scale;
 
         let rotation_quat = Quat::from_euler(

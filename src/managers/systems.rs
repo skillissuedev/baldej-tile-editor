@@ -117,8 +117,6 @@ pub fn add_system(system: Box<dyn System>) {
 
 pub fn register_object_id_name(id: u128, name: &str) {
     unsafe {
-        dbg!(id);
-        dbg!(name);
         match OBJECTS_ID_NAMES.get_mut(&id) {
             Some(name_in_map) => {
                 *name_in_map = name.into();

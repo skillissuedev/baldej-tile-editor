@@ -45,7 +45,8 @@ impl InstancedModelPositionHolder {
 impl InstancedModelPositionHolder {
     fn setup_mat(transform: &Transform) -> Mat4 {
         let rotation_vector = deg_vec_to_rad(transform.rotation);
-        let translation_vector = transform.position;
+        let mut translation_vector = transform.position;
+        translation_vector.z = -translation_vector.z;
         let scale_vector = transform.scale;
 
         let rotation_quat = Quat::from_euler(

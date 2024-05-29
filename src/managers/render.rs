@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{math_utils::deg_to_rad, objects::instanced_model_object::SetupMatrixResult};
+use crate::math_utils::deg_to_rad;
 use glam::{Mat4, Quat, Vec3, Vec4};
 use glium::{
     framebuffer::SimpleFrameBuffer, implement_vertex, index::PrimitiveType,

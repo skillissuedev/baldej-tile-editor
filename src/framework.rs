@@ -58,6 +58,11 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
         .get_mut(&FontFamily::Proportional)
         .unwrap()
         .insert(0, "JetBrains Mono".into());
+    fonts
+        .families
+        .get_mut(&FontFamily::Monospace)
+        .unwrap()
+        .insert(0, "JetBrains Mono".into());
     egui_glium.egui_ctx.set_fonts(fonts);
     let mut ui_state = managers::ui::UiState::default();
 

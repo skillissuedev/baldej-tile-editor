@@ -2,7 +2,7 @@ use super::System;
 use crate::{
     assets::{model_asset::ModelAsset, shader_asset::{ShaderAsset, ShaderAssetPath}, texture_asset::TextureAsset}, framework::{get_delta_time, get_resolution}, managers::{
         input::{self, is_mouse_locked, set_mouse_locked, InputEventType}, networking::Message, physics::{BodyColliderType, BodyType}, render::{get_camera_front, get_camera_position, get_camera_right, get_camera_rotation, set_camera_position, set_camera_rotation, set_light_direction}, systems::{CallList, SystemValue}
-    }, objects::{instanced_model_transform_holder::InstancedModelPositionHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, ray::Ray, Object, Transform}
+    }, objects::{instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, ray::Ray, Object, Transform}
 };
 use egui_glium::egui_winit::egui::{Color32, ComboBox, Pos2, ScrollArea, TextEdit, Vec2, Window};
 use glam::Vec3;
@@ -329,7 +329,7 @@ fn new_prop_name_client(tile: &mut Box<Object>, transform: Transform, model: Mod
 
                             let tile = self.find_object_mut("tile").unwrap();
                             tile.add_child(Box::new(master_instance));
-                            let positions_holder = InstancedModelPositionHolder::new(&format!("{}_holder", prop_name), &master_instance_name, instances);
+                            let positions_holder = InstancedModelTransformHolder::new(&format!("{}_holder", prop_name), &master_instance_name, instances);
                             self.add_object(Box::new(positions_holder))
                         }
                     }

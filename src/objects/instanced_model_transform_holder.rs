@@ -9,7 +9,7 @@ use glium::{
 };
 
 #[derive(Debug)]
-pub struct InstancedModelPositionHolder {
+pub struct InstancedModelTransformHolder {
     name: String,
     transform: Transform,
     parent_transform: Option<Transform>,
@@ -21,14 +21,14 @@ pub struct InstancedModelPositionHolder {
     mats: Vec<Mat4>
 }
 
-impl InstancedModelPositionHolder {
+impl InstancedModelTransformHolder {
     pub fn new(
         name: &str,
         instance: &str,
         transforms: Vec<Transform>
     ) -> Self {
 
-        InstancedModelPositionHolder {
+        InstancedModelTransformHolder {
             transform: Transform::default(),
             children: vec![],
             name: name.to_string(),
@@ -42,7 +42,7 @@ impl InstancedModelPositionHolder {
     }
 }
 
-impl InstancedModelPositionHolder {
+impl InstancedModelTransformHolder {
     fn setup_mat(transform: &Transform) -> Mat4 {
         let rotation_vector = deg_vec_to_rad(transform.rotation);
         let mut translation_vector = transform.position;
@@ -68,7 +68,7 @@ impl InstancedModelPositionHolder {
     }
 }
 
-impl Object for InstancedModelPositionHolder {
+impl Object for InstancedModelTransformHolder {
     fn start(&mut self) {}
 
     fn update(&mut self) {

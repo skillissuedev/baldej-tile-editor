@@ -69,7 +69,7 @@ impl System for MainSystem {
         ctx.debug_painter().circle(Pos2::new(screen_center.x, screen_center.y), 3.0, Color32::WHITE, (1.0, Color32::WHITE));
 
         let transforms_part_list: Vec<String> = self.props_list.iter().map(|prop| {
-            let mut result = format!("const PROP_{}_TRANSFORMS = vec![", prop.name);
+            let mut result = format!("\nconst PROP_{}_TRANSFORMS = vec![", prop.name);
             for instance in &prop.instances {
                 let pos = instance.position;
                 let rot = instance.rotation;
@@ -77,7 +77,7 @@ impl System for MainSystem {
 
                 result.push_str(
                     &format!(
-                        "\nTransform {{ position: Vec3::new({}, {}, {}), rotation: Vec3::new({}, {}, {}), scale: Vec3::new({}, {}, {}) }}",
+                        "\n    Transform {{ position: Vec3::new({}, {}, {}), rotation: Vec3::new({}, {}, {}), scale: Vec3::new({}, {}, {}) }}",
                         pos.x, pos.y, pos.z, rot.x, rot.y, rot.z, sc.x, sc.y, sc.z,
                     )
                 );
@@ -85,13 +85,68 @@ impl System for MainSystem {
             result.push_str("\n];");
             result
         }).collect();
-        dbg!(transforms_part_list);
+        dbg!(&transforms_part_list);
+
+        let spawn_prop_server_part_list: Vec<String> = self.props_list.iter().map(|prop| {
+            format!(
+                "\n\nfn new_prop_{}_server(tile: &mut Box<Object>, transform: Transform) {{\n    // so spawn the object here, i guess?\n    tile.add_child(Box::new(prop));\n}}",
+                prop.name
+            )
+        }).collect();
+        dbg!(&spawn_prop_server_part_list);
+
+        let spawn_prop_client_part_list: Vec<String> = self.props_list.iter().map(|prop| {
+            format!(
+                "\n\nfn new_prop_{}_client(tile: &mut Box<Object>, transform: Transform, model: ModelAsset, texture: TextureAsset) {{\n    let prop = ModelObject::new(\"{}\", model, Some(texture), ShaderAsset::load_default_shader().unwrap());\n    prop.set_transform(transform);\n    // so spawn the object here, i guess?\n    tile.add_child(Box::new(prop));\n}}",
+                prop.name, prop.name
+            )
+        }).collect();
+        dbg!(&spawn_prop_client_part_list);
+
+        let mut spawn_tile_client = format!(
+            "\n\nfn spawn_tile_client(&mut self, position: Vec3) {{\n   let tile_model_asset = ModelAsset::from_gltf(\"{}\");\n    let tile_texture_asset = TextureAsset::from_file(\"{}\");\n    let tile = Box::new(ModelObject::new(\"tile\", tile_model_asset, Some(tile_texture_asset), ShaderAsset::load_default_shader().unwrap()));\n    tile.set_position(position);\n    // maybe build a body here?\n\n\n    //and do the similar thing for all of the props\n",
+            self.tile_path, self.texture_path
+        );
+
+        for prop in &self.props_list {
+            spawn_tile_client.push_str(&format!(
+                "\n    let prop_{}_model = ModelAsset::from_gltf(\"{}\");\n    let prop_{}_texture = TextureAsset::from_file(\"{}\");\n    // USING TILE AS A PARENT!\n    for prop_transform in PROP_{}_TRANSFORMS {{\n        new_prop_{}_client(tile, prop_transform,\n            prop_{}_model.clone(), prop_{}_texture.clone()\n        );\n    }}", 
+                prop.name, prop.model_path, prop.name, prop.texture_path, prop.name, prop.name, prop.name, prop.name));
+        }
+        spawn_tile_client.push_str("\n}");
+        dbg!(&spawn_tile_client);
+
+        let mut spawn_tile_server = format!(
+            "\n\nfn spawn_tile_server(&mut self, position: Vec3) {{\n    let tile_model_asset = ModelAsset::new(\"{}\");\n    let tile = EmptyObject::new(\"tile\");\n   tile.set_position(position);\n    tile.build_object_body(/*build the trimesh static thing here*/);\n\n",
+            self.tile_path
+        );
+
+        for prop in &self.props_list {
+            spawn_tile_server.push_str(&format!(
+                "\n    // USING TILE AS A PARENT!\n    for prop_transform in PROP_{}_TRANSFORMS {{\n        new_prop_{}_server(tile, prop_transform);\n    }}", 
+                prop.name, prop.name)
+            );
+        }
+        spawn_tile_server.push_str("\n}");
+        dbg!(&spawn_tile_server);
 
 
         Window::new("generated code").show(ctx, |ui| {
             ui.heading("generated code:");
             ScrollArea::vertical().show(ui, |ui| {
-            ui.add(TextEdit::multiline(&mut "const PROP_NAME_TRANSFORMS = vec![
+                let mut generated_code = String::new();
+                for i in &transforms_part_list {
+                    generated_code.push_str(&i);
+                }
+                for i in &spawn_prop_client_part_list {
+                    generated_code.push_str(&i);
+                }
+                for i in &spawn_prop_server_part_list {
+                    generated_code.push_str(&i);
+                }
+                generated_code.push_str(&spawn_tile_client);
+                ui.add(TextEdit::multiline(&mut generated_code).code_editor().desired_rows(20).desired_width(f32::INFINITY));
+                /*ui.add(TextEdit::multiline(&mut "const PROP_NAME_TRANSFORMS = vec![
     Transform { position: .., rotation: .., scale: .. },
     Transform { position: .., rotation: .., scale: .. },
     ...
@@ -141,7 +196,7 @@ fn new_prop_name_client(tile: &mut Box<Object>, transform: Transform, model: Mod
     prop.set_transform(transform);
     // so spawn the object here, i guess?
     tile.add_child(Box::new(prop));
-}").code_editor().desired_rows(20).desired_width(f32::INFINITY));
+}").code_editor().desired_rows(20).desired_width(f32::INFINITY));*/
             });
         });
 

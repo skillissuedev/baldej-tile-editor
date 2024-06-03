@@ -1,4 +1,4 @@
-# Engine Tile Editor
+# Tile Editor
 Small program for desining tiles for my game.
 # How to use
 WASD to move, RMB/Return to place the selected prop, Z to undo.

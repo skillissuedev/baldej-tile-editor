@@ -167,58 +167,8 @@ impl System for MainSystem {
                     generated_code.push_str(&i);
                 }
                 generated_code.push_str(&spawn_tile_client);
+                generated_code.push_str(&spawn_tile_server);
                 ui.add(TextEdit::multiline(&mut generated_code).code_editor().desired_rows(20).desired_width(f32::INFINITY));
-                /*ui.add(TextEdit::multiline(&mut "const PROP_NAME_TRANSFORMS = vec![
-    Transform { position: .., rotation: .., scale: .. },
-    Transform { position: .., rotation: .., scale: .. },
-    ...
-];
-
-fn spawn_tile_server(&mut self, position: Vec3) {
-    let tile_model_asset = ModelAsset::new(\"path_here\");
-    let tile = EmptyObject::new(/*using our assets here*/);
-    tile.set_position(position);
-    tile.build_object_body(/*build the trimesh static thing here*/);
-
-
-    // USING TILE AS A PARENT!
-    for prop_transform in PROP_NAME_TRANSFORMS {
-        new_prop_name_server(tile, prop_transform);
-    }
-    // and do the similar thing for all of the props
-    self.add_object(tile);
-}
-
-fn spawn_tile_client(&mut self, position: Vec3) {
-    let tile_model_asset = ModelAsset::new(\"path_here\");
-    let tile_texture_asset = TextureAsset::new(\"path_here\");
-    let tile = Box::new(ModelObject::new(/*using our assets here*/));
-    tile.set_position(position);
-    // maybe build a body here?
-
-
-    let prop_name_model = ModelAsset::new(\"path\");
-    let prop_name_texture = ModelAsset::new(\"path\");
-    // USING TILE AS A PARENT!
-    for prop_transform in PROP_NAME_TRANSFORMS {
-        new_prop_name_client(tile, prop_transform,
-            prop_name_model.clone, prop_name_texture
-        );
-    }
-    // and do the similar thing for all of the props
-}
-
-fn new_prop_name_server(tile: &mut Box<Object>, transform: Transform) {
-    // so spawn the object here, i guess?
-    tile.add_child(Box::new(prop));
-}
-
-fn new_prop_name_client(tile: &mut Box<Object>, transform: Transform, model: ModelAsset, texture: TextureAsset) {
-    let prop = ModelObject::new(model, texture);
-    prop.set_transform(transform);
-    // so spawn the object here, i guess?
-    tile.add_child(Box::new(prop));
-}").code_editor().desired_rows(20).desired_width(f32::INFINITY));*/
             });
         });
 
@@ -306,9 +256,18 @@ fn new_prop_name_client(tile: &mut Box<Object>, transform: Transform, model: Mod
             if ui.button("randomly place").clicked() {
                 if let Ok(quantity) = self.randomly_place_quantity.parse::<usize>() {
                     let mut current_prop = None;
+                    for prop in &self.props_list {
+                        if prop.name == self.current_prop {
+                            if let Some(_) = self.find_object(&format!("{}_holder", &prop.name)) {
+                                return;
+                            }
+                        }
+                    }
+
                     for prop in &mut self.props_list {
                         if prop.name == self.current_prop {
-                            current_prop = Some(prop)
+                            current_prop = Some(prop);
+                            break
                         }
                     }
 
@@ -345,6 +304,7 @@ fn new_prop_name_client(tile: &mut Box<Object>, transform: Transform, model: Mod
                                         rotation: Default::default(),
                                         scale: Vec3::ONE,
                                     };
+
                                     instances.push(transform);
                                     current_prop.instanced_transforms.push(transform);
                                 }

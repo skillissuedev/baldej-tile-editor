@@ -13,7 +13,8 @@ struct Prop {
     name: String,
     model_path: String,
     texture_path: String,
-    instances: Vec<Transform>
+    regular_transforms: Vec<Transform>,
+    instanced_transforms: Vec<Transform>,
 }
 
 pub struct MainSystem {
@@ -70,14 +71,32 @@ impl System for MainSystem {
 
         let transforms_part_list: Vec<String> = self.props_list.iter().map(|prop| {
             let mut result = format!("\nconst PROP_{}_TRANSFORMS = vec![", prop.name);
-            for instance in &prop.instances {
+            for instance in &prop.regular_transforms {
                 let pos = instance.position;
                 let rot = instance.rotation;
                 let sc = instance.scale;
 
                 result.push_str(
                     &format!(
-                        "\n    Transform {{ position: Vec3::new({}, {}, {}), rotation: Vec3::new({}, {}, {}), scale: Vec3::new({}, {}, {}) }}",
+                        "\n    Transform {{ position: Vec3::new({}, {}, {}), rotation: Vec3::new({}, {}, {}), scale: Vec3::new({}, {}, {}) }},",
+                        pos.x, pos.y, pos.z, rot.x, rot.y, rot.z, sc.x, sc.y, sc.z,
+                    )
+                );
+            }
+            result.push_str("\n];");
+            result
+        }).collect();
+
+        let instanced_transforms_part_list: Vec<String> = self.props_list.iter().map(|prop| {
+            let mut result = format!("\nconst PROP_{}_INSTANCED_TRANSFORMS = vec![", prop.name);
+            for instance in &prop.instanced_transforms {
+                let pos = instance.position;
+                let rot = instance.rotation;
+                let sc = instance.scale;
+
+                result.push_str(
+                    &format!(
+                        "\n    Transform {{ position: Vec3::new({}, {}, {}), rotation: Vec3::new({}, {}, {}), scale: Vec3::new({}, {}, {}) }},",
                         pos.x, pos.y, pos.z, rot.x, rot.y, rot.z, sc.x, sc.y, sc.z,
                     )
                 );
@@ -136,6 +155,9 @@ impl System for MainSystem {
             ScrollArea::vertical().show(ui, |ui| {
                 let mut generated_code = String::new();
                 for i in &transforms_part_list {
+                    generated_code.push_str(&i);
+                }
+                for i in &instanced_transforms_part_list {
                     generated_code.push_str(&i);
                 }
                 for i in &spawn_prop_client_part_list {
@@ -248,7 +270,8 @@ fn new_prop_name_client(tile: &mut Box<Object>, transform: Transform, model: Mod
                     name: self.new_prop_name.clone(),
                     model_path: self.new_prop_path.clone(),
                     texture_path: self.new_prop_texture.clone(),
-                    instances: Vec::new()
+                    instanced_transforms: Vec::new(),
+                    regular_transforms: Vec::new()
                 });
             }
 
@@ -283,7 +306,7 @@ fn new_prop_name_client(tile: &mut Box<Object>, transform: Transform, model: Mod
             if ui.button("randomly place").clicked() {
                 if let Ok(quantity) = self.randomly_place_quantity.parse::<usize>() {
                     let mut current_prop = None;
-                    for prop in &self.props_list {
+                    for prop in &mut self.props_list {
                         if prop.name == self.current_prop {
                             current_prop = Some(prop)
                         }
@@ -317,11 +340,13 @@ fn new_prop_name_client(tile: &mut Box<Object>, transform: Transform, model: Mod
                                 let z = thread_rng().gen_range(min_z..max_z);
                                 ray.set_position(Vec3::new(x, 500.0, z), false);
                                 if let Some(position) = ray.intersection_position() {
-                                    instances.push(Transform {
+                                    let transform = Transform {
                                         position,
                                         rotation: Default::default(),
                                         scale: Vec3::ONE,
-                                    });
+                                    };
+                                    instances.push(transform);
+                                    current_prop.instanced_transforms.push(transform);
                                 }
                             }
                             let prop_name = current_prop.name.clone();
@@ -497,7 +522,7 @@ fn new_prop_name_client(tile: &mut Box<Object>, transform: Transform, model: Mod
                         });
                         prop.build_object_rigid_body(Some(BodyType::Fixed(Some(BodyColliderType::TriangleMesh(model_asset)))), None, 1.0, None, None);
                         prop.set_position(pos, true);
-                        current_prop.instances.push(prop.local_transform());
+                        current_prop.regular_transforms.push(prop.local_transform());
                         self.add_object(Box::new(prop));
                     }
                 }
@@ -514,7 +539,7 @@ fn new_prop_name_client(tile: &mut Box<Object>, transform: Transform, model: Mod
 
                             for prop in &mut self.props_list {
                                 if prop.name == *prop_name {
-                                    prop.instances.retain(|x| *x != transform);
+                                    prop.regular_transforms.retain(|x| *x != transform);
                                     self.delete_object(&object_name);
                                     self.last_actions.remove(idx);
                                     return
@@ -523,6 +548,12 @@ fn new_prop_name_client(tile: &mut Box<Object>, transform: Transform, model: Mod
                         }
                     },
                     Action::NewInstancedObjects(name) => {
+                        for prop in &mut self.props_list {
+                            if prop.name == *name {
+                                prop.instanced_transforms.clear();
+                                break
+                            }
+                        } 
                         self.delete_object(&format!("{}_master", name));
                         self.delete_object(&format!("{}_holder", name));
                         self.last_actions.remove(idx);

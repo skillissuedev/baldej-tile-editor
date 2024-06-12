@@ -26,7 +26,7 @@ downcast-rs = "1.2.0"
 #das-grid = "0.1.5"
 grid_pathfinding = "0.1.1"
 grid_util = "=0.1.1"
-egui_glium = "=0.20.1"
+egui_glium = { version = "=0.20.1", features=["clipboard"] }
 rand = "0.8.5"
 
 [profile.dev.package.rapier3d]

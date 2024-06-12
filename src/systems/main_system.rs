@@ -215,18 +215,23 @@ impl System for MainSystem {
             self.tile_path
         );
 
-        Window::new("generated lua code").show(ctx, |ui| {
-            ui.heading("generated code:");
+        Window::new("Generated Lua code").show(ctx, |ui| {
+            let mut generated_code = String::new();
+            for i in &transforms_part_list {
+                generated_code.push_str(&i);
+            }
+            for i in &instanced_transforms_part_list {
+                generated_code.push_str(&i);
+            }
+            generated_code.push_str(&spawn_tile_client);
+            generated_code.push_str(&spawn_tile_server);
+            ui.horizontal(|ui| {
+                ui.heading("generated code:");
+                if ui.button("copy").clicked() {
+                    ui.output().copied_text = generated_code.clone();
+                };
+            });            
             ScrollArea::vertical().show(ui, |ui| {
-                let mut generated_code = String::new();
-                for i in &transforms_part_list {
-                    generated_code.push_str(&i);
-                }
-                for i in &instanced_transforms_part_list {
-                    generated_code.push_str(&i);
-                }
-                generated_code.push_str(&spawn_tile_client);
-                generated_code.push_str(&spawn_tile_server);
                 ui.add(TextEdit::multiline(&mut generated_code).code_editor().desired_rows(20).desired_width(f32::INFINITY));
             });
         });

@@ -69,6 +69,7 @@ impl System for MainSystem {
         let screen_center = get_resolution() / 2.0;
         ctx.debug_painter().circle(Pos2::new(screen_center.x, screen_center.y), 3.0, Color32::WHITE, (1.0, Color32::WHITE));
 
+        // Generating Rust code
         let transforms_part_list: Vec<String> = self.props_list.iter().map(|prop| {
             let mut result = format!("\nconst PROP_{}_TRANSFORMS = vec![", prop.name);
             for instance in &prop.regular_transforms {
@@ -104,7 +105,6 @@ impl System for MainSystem {
             result.push_str("\n];");
             result
         }).collect();
-        dbg!(&transforms_part_list);
 
         let spawn_prop_server_part_list: Vec<String> = self.props_list.iter().map(|prop| {
             format!(
@@ -112,7 +112,6 @@ impl System for MainSystem {
                 prop.name
             )
         }).collect();
-        dbg!(&spawn_prop_server_part_list);
 
         let spawn_prop_client_part_list: Vec<String> = self.props_list.iter().map(|prop| {
             format!(
@@ -120,7 +119,6 @@ impl System for MainSystem {
                 prop.name, prop.name
             )
         }).collect();
-        dbg!(&spawn_prop_client_part_list);
 
         let mut spawn_tile_client = format!(
             "\n\nfn spawn_tile_client(&mut self, position: Vec3) {{\n   let tile_model_asset = ModelAsset::from_gltf(\"{}\");\n    let tile_texture_asset = TextureAsset::from_file(\"{}\");\n    let tile = Box::new(ModelObject::new(\"tile\", tile_model_asset, Some(tile_texture_asset), ShaderAsset::load_default_shader().unwrap()));\n    tile.set_position(position);\n    // maybe build a body here?\n\n\n    //and do the similar thing for all of the props\n",
@@ -133,7 +131,6 @@ impl System for MainSystem {
                 prop.name, prop.model_path, prop.name, prop.texture_path, prop.name, prop.name, prop.name, prop.name));
         }
         spawn_tile_client.push_str("\n}");
-        dbg!(&spawn_tile_client);
 
         let mut spawn_tile_server = format!(
             "\n\nfn spawn_tile_server(&mut self, position: Vec3) {{\n    let tile_model_asset = ModelAsset::new(\"{}\");\n    let tile = EmptyObject::new(\"tile\");\n   tile.set_position(position);\n    tile.build_object_body(/*build the trimesh static thing here*/);\n\n",
@@ -147,7 +144,6 @@ impl System for MainSystem {
             );
         }
         spawn_tile_server.push_str("\n}");
-        dbg!(&spawn_tile_server);
 
 
         Window::new("generated code").show(ctx, |ui| {
@@ -171,6 +167,70 @@ impl System for MainSystem {
                 ui.add(TextEdit::multiline(&mut generated_code).code_editor().desired_rows(20).desired_width(f32::INFINITY));
             });
         });
+
+        // Generating Lua code
+        let transforms_part_list: Vec<String> = self.props_list.iter().map(|prop| {
+            let mut result = format!("\nprop_{}_transorms = {{", prop.name);
+            for instance in &prop.regular_transforms {
+                let pos = instance.position;
+                let rot = instance.rotation;
+                let sc = instance.scale;
+
+                result.push_str(
+                    &format!(
+                        "\n    {{ {{{}, {}, {}}}, {{{}, {}, {}}}, {{{}, {}, {}}} }},",
+                        pos.x, pos.y, pos.z, rot.x, rot.y, rot.z, sc.x, sc.y, sc.z,
+                    )
+                );
+            }
+            result.push_str("\n}");
+            result
+        }).collect();
+
+        let instanced_transforms_part_list: Vec<String> = self.props_list.iter().map(|prop| {
+            let mut result = format!("\nconst prop_{}_instanced_positions = {{", prop.name);
+            for instance in &prop.instanced_transforms {
+                let pos = instance.position;
+                let rot = instance.rotation;
+                let sc = instance.scale;
+
+                result.push_str(
+                    &format!(
+                        "\n    {{ {{{}, {}, {}}}, {{{}, {}, {}}}, {{{}, {}, {}}} }},",
+                        pos.x, pos.y, pos.z, rot.x, rot.y, rot.z, sc.x, sc.y, sc.z,
+                    )
+                );
+            }
+            result.push_str("\n}");
+            result
+        }).collect();
+
+        let spawn_tile_client = format!(
+            "\n\nfunction spawn_tile_client(position)\n    new_model_object(\"tile\", \"{}\", \"{}\")\n    local object = find_object(\"tile\")\n    object.set_position(position[1], position[2], position[3])\n    -- maybe build a body here?\n    -- and spawn props\nend",
+            self.tile_path, self.texture_path
+        );
+
+        let spawn_tile_server = format!(
+            "\n\nfunction spawn_tile_server(position)\n    new_empty_object(\"tile\")\n    local object = find_object(\"tile\")\n    object.set_position(position[1], position[2], position[3])\n    object.build_object_triangle_mesh_rigid_body(\"Fixed\", \"{}\", \"None\", 0, 0, 0, 1)\nend\n",
+            self.tile_path
+        );
+
+        Window::new("generated lua code").show(ctx, |ui| {
+            ui.heading("generated code:");
+            ScrollArea::vertical().show(ui, |ui| {
+                let mut generated_code = String::new();
+                for i in &transforms_part_list {
+                    generated_code.push_str(&i);
+                }
+                for i in &instanced_transforms_part_list {
+                    generated_code.push_str(&i);
+                }
+                generated_code.push_str(&spawn_tile_client);
+                generated_code.push_str(&spawn_tile_server);
+                ui.add(TextEdit::multiline(&mut generated_code).code_editor().desired_rows(20).desired_width(f32::INFINITY));
+            });
+        });
+
 
         Window::new("editor").show(ctx, |ui| {
             ui.label("use the RMB/Return to place the selected prop, Z to undo");
@@ -341,6 +401,10 @@ impl System for MainSystem {
 
         set_camera_position(Vec3::new(0.0, 0.0, 0.0));
         input::new_bind(
+            "slower",
+            vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::LShift)],
+        );
+        input::new_bind(
             "forward",
             vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::W)],
         );
@@ -399,7 +463,12 @@ impl System for MainSystem {
 
         set_camera_rotation(Vec3::new(camera_rotation.x - delta.y * 50.0 * delta_time, camera_rotation.y + delta.x * 50.0 * delta_time, camera_rotation.z));
 
-        let speed = 420.0 * delta_time;
+        let speed;
+        if input::is_bind_down("slower") {
+            speed = 50.0 * delta_time;
+        } else {
+            speed = 420.0 * delta_time;
+        }
 
         let camera_front = get_camera_front();
         let camera_right = get_camera_right();

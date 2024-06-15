@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
-use crate::{objects::ObjectGroup, systems::System};
+use crate::{framework::Framework, objects::ObjectGroup, systems::System};
 use egui_glium::egui_winit::egui::Context;
 use glam::Mat4;
-use glium::{framebuffer::SimpleFrameBuffer, Display, Frame};
+use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, Display, Frame};
 use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 
 use super::{
     debugger, networking, render::{Cascades, ShadowTextures}
@@ -37,17 +38,17 @@ pub fn get_system_mut_with_id(id: &str) -> Option<&mut Box<dyn System>> {
     }
 }
 
-pub fn update() {
+pub fn update(framework: &mut Framework) {
     unsafe {
         if networking::is_server() {
             for system in &mut SYSTEMS {
-                system.server_update();
-                system.update_objects();
+                system.server_update(framework);
+                system.update_objects(framework);
             }
         } else {
             for system in &mut SYSTEMS {
-                system.client_update();
-                system.update_objects();
+                system.client_update(framework);
+                system.update_objects(framework);
             }
         }
     }
@@ -58,7 +59,7 @@ pub fn get_systems_iter<'a>() -> std::slice::Iter<'a, Box<dyn System>> {
 }
 
 pub fn render(
-    display: &Display,
+    display: &Display<WindowSurface>,
     target: &mut Frame,
     cascades: &Cascades,
     shadow_textures: &ShadowTextures,
@@ -88,7 +89,7 @@ pub fn ui_render(
     }
 }
 
-pub fn shadow_render(view_proj: &Mat4, display: &Display, target: &mut SimpleFrameBuffer) {
+pub fn shadow_render(view_proj: &Mat4, display: &Display<WindowSurface>, target: &mut SimpleFrameBuffer) {
     unsafe {
         if !networking::is_server() {
             for system in &mut SYSTEMS {
@@ -98,19 +99,19 @@ pub fn shadow_render(view_proj: &Mat4, display: &Display, target: &mut SimpleFra
     }
 }
 
-pub fn add_system(system: Box<dyn System>) {
+pub fn add_system(system: Box<dyn System>, framework: &mut Framework) {
     unsafe {
         SYSTEMS.push(system);
         if networking::is_server() {
             SYSTEMS
                 .last_mut()
                 .expect("Failed to add system")
-                .server_start();
+                .server_start(framework);
         } else {
             SYSTEMS
                 .last_mut()
                 .expect("Failed to add system")
-                .client_start();
+                .client_start(framework);
         }
     }
 }
@@ -180,7 +181,7 @@ pub struct CallList {
     pub mut_call: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SystemValue {
     String(String),
     Int(i32),

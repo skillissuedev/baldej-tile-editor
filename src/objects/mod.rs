@@ -1,5 +1,5 @@
 use crate::{
-    framework,
+    framework::{self, Framework},
     managers::{
         self,
         physics::{self, BodyType, CollisionGroups, ObjectBodyParameters, RenderColliderType},
@@ -9,7 +9,7 @@ use crate::{
 use downcast_rs::{impl_downcast, Downcast};
 use egui_glium::egui_winit::egui::Ui;
 use glam::{Mat4, Vec3};
-use glium::{framebuffer::SimpleFrameBuffer, Display, Frame};
+use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, Display, Frame};
 use serde::{Deserialize, Serialize};
 
 pub mod camera_position;
@@ -44,7 +44,7 @@ pub trait Object: std::fmt::Debug + Downcast {
     }
 
     fn start(&mut self);
-    fn update(&mut self);
+    fn update(&mut self, framework: &mut Framework);
     fn children_list(&self) -> &Vec<Box<dyn Object>>;
     fn children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>>;
     fn name(&self) -> &str;
@@ -67,7 +67,7 @@ pub trait Object: std::fmt::Debug + Downcast {
 
     fn render(
         &mut self,
-        _display: &Display,
+        _display: &Display<WindowSurface>,
         _target: &mut Frame,
         _cascades: &Cascades,
         _shadow_textures: &ShadowTextures,
@@ -77,7 +77,7 @@ pub trait Object: std::fmt::Debug + Downcast {
     fn shadow_render(
         &mut self,
         _view_proj: &Mat4,
-        _display: &Display,
+        _display: &Display<WindowSurface>,
         _target: &mut SimpleFrameBuffer,
     ) {
     }
@@ -140,19 +140,19 @@ pub trait Object: std::fmt::Debug + Downcast {
         }
     }
 
-    fn update_children(&mut self) {
+    fn update_children(&mut self, framework: &mut Framework) {
         let global_transform = self.global_transform();
 
         self.children_list_mut().iter_mut().for_each(|child| {
             child.set_parent_transform(global_transform);
-            child.update();
-            child.update_children();
+            child.update(framework);
+            child.update_children(framework);
         });
     }
 
     fn render_children(
         &mut self,
-        display: &Display,
+        display: &Display<WindowSurface>,
         target: &mut Frame,
         cascades: &Cascades,
         shadow_texture: &ShadowTextures,
@@ -166,7 +166,7 @@ pub trait Object: std::fmt::Debug + Downcast {
     fn shadow_render_children(
         &mut self,
         view_proj: &Mat4,
-        display: &Display,
+        display: &Display<WindowSurface>,
         target: &mut SimpleFrameBuffer,
     ) {
         self.children_list_mut().iter_mut().for_each(|child| {
@@ -231,7 +231,7 @@ pub trait Object: std::fmt::Debug + Downcast {
         self.children_list_mut().last_mut().unwrap().start();
     }
 
-    fn delete_child(&mut self, name: &str) {
+    fn delete_child(&mut self, name: &str) -> bool {
         for (idx, object) in self.children_list_mut().iter_mut().enumerate() {
             if object.name() == name {
                 if let Some(body_parameters) = object.body_parameters() {
@@ -243,10 +243,11 @@ pub trait Object: std::fmt::Debug + Downcast {
                     }
                 }
                 self.children_list_mut().remove(idx);
-                return;
+                return true;
             }
-            object.delete_child(name);
+            return object.delete_child(name);
         }
+        false
     }
 
     fn build_object_rigid_body(

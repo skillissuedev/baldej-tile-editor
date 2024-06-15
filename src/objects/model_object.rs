@@ -4,23 +4,18 @@ use crate::{
         model_asset::{self, Animation, AnimationChannel, AnimationChannelType, ModelAsset},
         shader_asset::ShaderAsset,
         texture_asset::TextureAsset,
-    },
-    managers::{
+    }, framework::Framework, managers::{
         debugger::{self, error, warn},
         physics::ObjectBodyParameters,
         render::{self, Cascades, ShadowTextures, Vertex},
-    },
-    math_utils::deg_to_rad,
+    }, math_utils::deg_to_rad
 };
 use egui_glium::egui_winit::egui::ComboBox;
 use glam::{Mat4, Quat, Vec3};
 use glium::{
-    framebuffer::SimpleFrameBuffer,
-    uniform,
-    uniforms::{
+    framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, uniform, uniforms::{
         MagnifySamplerFilter, MinifySamplerFilter, Sampler, SamplerWrapFunction, UniformBuffer,
-    },
-    Display, IndexBuffer, Program, Surface, VertexBuffer,
+    }, Display, IndexBuffer, Program, Surface, VertexBuffer
 };
 use std::time::Instant;
 
@@ -39,8 +34,8 @@ pub struct ModelObject {
     pub texture_asset: Option<TextureAsset>,
     texture: Option<glium::texture::Texture2d>,
     vertex_buffer: Vec<VertexBuffer<Vertex>>,
-    program: Vec<Program>,
-    shadow_program: Vec<Program>,
+    programs: Vec<Program>,
+    shadow_programs: Vec<Program>,
     started: bool,
     error: bool,
     inspector_anim_name: String,
@@ -84,8 +79,8 @@ impl ModelObject {
             shader_asset,
             texture: None,
             vertex_buffer: vec![],
-            program: vec![],
-            shadow_program: vec![],
+            programs: vec![],
+            shadow_programs: vec![],
             started: false,
             error: false,
             animation_settings: CurrentAnimationSettings {
@@ -117,7 +112,7 @@ impl std::fmt::Debug for ModelObject {
 impl Object for ModelObject {
     fn start(&mut self) {}
 
-    fn update(&mut self) {
+    fn update(&mut self, _: &mut Framework) {
         self.update_animation();
         for node in &self.model_asset.root_nodes {
             set_nodes_global_transform(
@@ -216,7 +211,7 @@ impl Object for ModelObject {
 
     fn render(
         &mut self,
-        display: &Display,
+        display: &Display<WindowSurface>,
         target: &mut glium::Frame,
         cascades: &Cascades,
         shadow_texture: &ShadowTextures,
@@ -339,7 +334,7 @@ impl Object for ModelObject {
                 .draw(
                     &self.vertex_buffer[i],
                     &indices.unwrap(),
-                    &self.program[i],
+                    &self.programs[i],
                     &uniforms,
                     &draw_params,
                 )
@@ -350,7 +345,7 @@ impl Object for ModelObject {
     fn shadow_render(
         &mut self,
         view_proj: &Mat4,
-        display: &Display,
+        display: &Display<WindowSurface>,
         target: &mut SimpleFrameBuffer,
     ) {
         if !self.started {
@@ -422,7 +417,7 @@ impl Object for ModelObject {
                 .draw(
                     &self.vertex_buffer[i],
                     &indices.unwrap(),
-                    &self.shadow_program[i],
+                    &self.shadow_programs[i],
                     &uniforms,
                     &draw_params,
                 )
@@ -609,12 +604,14 @@ impl ModelObject {
         }
     }
 
-    fn start_mesh(&mut self, display: &Display) {
+    fn start_mesh(&mut self, display: &Display<WindowSurface>) {
         let shadow_shader = ShaderAsset::load_shadow_shader();
+
         let shadow_shader = if let Ok(shadow_shader) = shadow_shader {
             shadow_shader
         } else {
             error("failed to load shadow shader!");
+            self.error = true;
             return;
         };
 
@@ -624,7 +621,7 @@ impl ModelObject {
                 Ok(buff) => self.vertex_buffer.push(buff),
                 Err(err) => {
                     error(&format!(
-                        "Mesh object error:\nvertex buffer creation error!\nErr: {}",
+                        "ModelObject error:\nvertex buffer creation error!\nErr: {}",
                         err
                     ));
                     self.error = true;
@@ -653,11 +650,12 @@ impl ModelObject {
                 &fragment_shadow_shader_src,
                 None,
             );
+
             match program {
-                Ok(prog) => self.program.push(prog),
+                Ok(prog) => self.programs.push(prog),
                 Err(err) => {
                     error(&format!(
-                        "Mesh object error:\nprogram creation error!\nErr: {}",
+                        "ModelObject error:\nprogram creation error!\nErr: {}",
                         err
                     ));
                     self.error = true;
@@ -666,10 +664,10 @@ impl ModelObject {
             }
 
             match shadow_program {
-                Ok(prog) => self.shadow_program.push(prog),
+                Ok(prog) => self.shadow_programs.push(prog),
                 Err(err) => {
                     error(&format!(
-                        "Mesh object error:\nprogram creation error(shadow)!\nErr: {}",
+                        "ModelObject error:\nprogram creation error(shadow)!\nErr: {}",
                         err
                     ));
                     self.error = true;
@@ -690,7 +688,7 @@ impl ModelObject {
                 Ok(tx) => self.texture = Some(tx),
                 Err(err) => {
                     error(&format!(
-                        "Mesh object error:\ntexture creating error!\nErr: {}",
+                        "ModelObject error:\ntexture creating error!\nErr: {}",
                         err
                     ));
                     self.texture = None;
@@ -710,7 +708,7 @@ impl ModelObject {
                         Ok(tx) => self.texture = Some(tx),
                         Err(err) => {
                             error(&format!(
-                                "Mesh object error:\ntexture creating error!\nErr: {}",
+                                "ModelObject error:\ntexture creating error!\nErr: {}",
                                 err
                             ));
                             self.texture = None;

@@ -1,12 +1,12 @@
 pub mod lua_functions;
 use crate::{
-    assets::model_asset::ModelAsset, managers::{
+    assets::model_asset::ModelAsset, framework::Framework, managers::{
         assets, debugger, networking::{Message, MessageContents}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{self, CallList, SystemValue}
     }, objects::{character_controller::CharacterController, model_object::ModelObject, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, systems::System
 };
 use crate::objects::Object;
 use glam::Vec3;
-use mlua::{Error, FromLua, FromLuaMulti, Function, IntoLua, Lua, LuaOptions, StdLib, UserData};
+use mlua::{Error, FromLua, Function, IntoLua, Lua, LuaOptions, StdLib, UserData};
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, fs};
 
@@ -35,7 +35,6 @@ impl LuaSystem {
                 };
 
                 let load_result = lua.load(script).exec();
-                dbg!(&load_result);
 
                 match load_result {
                     Ok(_) => {
@@ -67,7 +66,7 @@ impl LuaSystem {
 }
 
 impl System for LuaSystem {
-    fn client_start(&mut self) {
+    fn client_start(&mut self, _: &mut Framework) {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
@@ -77,7 +76,7 @@ impl System for LuaSystem {
         }
     }
 
-    fn server_start(&mut self) {
+    fn server_start(&mut self, _: &mut Framework) {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
@@ -87,7 +86,7 @@ impl System for LuaSystem {
         }
     }
 
-    fn client_update(&mut self) {
+    fn client_update(&mut self, _: &mut Framework) {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
@@ -97,7 +96,7 @@ impl System for LuaSystem {
         }
     }
 
-    fn server_update(&mut self) {
+    fn server_update(&mut self, _: &mut Framework) {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
@@ -679,7 +678,6 @@ impl UserData for ObjectHandle {
                 Ok(None)
             },
         );
-        // i fucking hate my life
 
         methods.add_method(
             "groups_list",
@@ -788,7 +786,6 @@ impl UserData for ObjectHandle {
         );
 
 
-        // ah shit, here we go again
         // object-specific methods:
         methods.add_method("play_animation", |_, this, anim_name: String| {
             match systems::get_system_mut_with_id(&this.system_id) {
@@ -1084,8 +1081,8 @@ impl UserData for ObjectHandle {
                         match object.downcast_mut::<SoundEmitter>() {
                             Some(object) => {
                                 match object.get_max_distance() {
-                                    Ok(distance) => return Ok(Some(distance)),
-                                    Err(_) => (),
+                                    Some(distance) => return Ok(Some(distance)),
+                                    None => (),
                                 }
                             },
                             None => {
@@ -1162,6 +1159,7 @@ impl UserData for ObjectHandle {
 
             Ok(())
         });
+        // i could've used a macro
     }
 }
 
@@ -1215,6 +1213,7 @@ fn lua_body_render_colliders_and_groups_to_rust(object_name: String, object_syst
 
     (render_collider_type, body_type, membership, filter)
 }
+
 impl UserData for Message {
     fn add_methods<'lua, M: mlua::prelude::LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
         methods.add_method("contents_type", |_, this, _: ()| {
@@ -1230,7 +1229,7 @@ impl UserData for Message {
                     Ok(Some(message.object_name.to_string()))
                 },
                 MessageContents::Custom(_) => {
-                    debugger::error(&"lua error: get_sync_object_name in Message failed! the contents_type != 'SyncObject'");
+                    debugger::error(&"lua error: sync_object_name in Message failed! the contents_type != 'SyncObject'");
                     Ok(None)
                 },
             }
@@ -1252,7 +1251,7 @@ impl UserData for Message {
                     Ok(Some(pos_rot_scale))
                 },
                 MessageContents::Custom(_) => {
-                    debugger::error(&"lua error: get_sync_object_name in Message failed! the contents_type != 'SyncObject'");
+                    debugger::error(&"lua error: sync_object_pos_rot_scale in Message failed! the contents_type != 'SyncObject'");
                     Ok(None)
                 },
             }
@@ -1281,7 +1280,6 @@ impl UserData for Message {
                     Ok(None)
                 },
                 crate::managers::networking::MessageType::FromClient(sender) => {
-                    dbg!(&sender);
                     Ok(Some(sender.to_string()))
                 },
             }
@@ -1296,47 +1294,8 @@ impl UserData for Message {
     }
 }
 
-/*
-impl<'lua> FromLuaMulti<'lua> for SystemValue {
-    fn from_lua_multi(values: mlua::prelude::LuaMultiValue<'lua>, _lua: &'lua mlua::prelude::Lua) -> mlua::prelude::LuaResult<Self> {
-        if values.len() == 1 {
-            if let Some(value) = values.get(0) {
-                if let Some(value) = value.as_f32() {
-                    return Ok(SystemValue::Float(value));
-                } 
-                if let Some(value) = value.as_string() {
-                    return Ok(SystemValue::String(String::from(value.to_str().unwrap())));
-                } 
-                if let Some(value) = value.as_u32() {
-                    return Ok(SystemValue::UInt(value));
-                }
-                if let Some(value) = value.as_i32() {
-                    return Ok(SystemValue::Int(value));
-                }
-                if let Some(value) = value.as_boolean() {
-                    return Ok(SystemValue::Bool(value));
-                }
-                if let Some(value) = value.as_table() {
-                    let x: Result<f32, Error> = value.get(1);
-                    let y: Result<f32, Error> = value.get(2);
-                    let z: Result<f32, Error> = value.get(3);
-                    if let (Ok(x), Ok(y), Ok(z)) = (x.clone(), y, z) {
-                        return Ok(SystemValue::Vec3(x, y, z));
-                    } 
-                    if let Err(x) = x {
-                        println!("{}", x);
-                    }
-                }
-            }
-        } else {
-            debugger::error("FromLua for SystemValue failed! values.len != 1");
-        }
-        Err(Error::FromLuaConversionError { from: "-", to: "SystemValue", message: None })
-    }
-}*/
-
 impl<'lua> FromLua<'lua> for SystemValue {
-    fn from_lua(value: mlua::prelude::LuaValue<'lua>, lua: &'lua Lua) -> mlua::prelude::LuaResult<Self> {
+    fn from_lua(value: mlua::prelude::LuaValue<'lua>, _: &'lua Lua) -> mlua::prelude::LuaResult<Self> {
         if let Some(value) = value.as_f32() {
             return Ok(SystemValue::Float(value));
         } 
@@ -1379,3 +1338,5 @@ impl<'lua> IntoLua<'lua> for SystemValue {
         }
     }
 }
+
+impl UserData for ModelAsset {}

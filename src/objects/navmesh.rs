@@ -1,11 +1,12 @@
 use glam::Vec2;
+use glium::{glutin::surface::WindowSurface, Display};
 //use recast_rs::{util, Heightfield, CompactHeightfield, NoRegions, PolyMesh, ContourBuildFlags, ContourSet};
 use super::{gen_object_id, Object, ObjectGroup, Transform};
-use crate::managers::{
+use crate::{framework::Framework, managers::{
     debugger,
     navigation::{self, NavMeshDimensions},
     physics::ObjectBodyParameters,
-};
+}};
 
 //#[derive(Debug)]
 pub struct NavigationGround {
@@ -37,7 +38,7 @@ impl NavigationGround {
 impl Object for NavigationGround {
     fn start(&mut self) {}
 
-    fn update(&mut self) {
+    fn update(&mut self, _: &mut Framework) {
         let pos = self.global_transform().position;
         self.dimensions.set_position(Vec2::new(pos.x, pos.z));
 
@@ -120,7 +121,7 @@ impl Object for NavigationGround {
 
     fn render(
         &mut self,
-        _display: &glium::Display,
+        _display: &Display<WindowSurface>,
         _target: &mut glium::Frame,
         _cascades: &crate::managers::render::Cascades,
         _shadow_textures: &crate::managers::render::ShadowTextures,
@@ -130,7 +131,7 @@ impl Object for NavigationGround {
     fn shadow_render(
         &mut self,
         _view_proj: &glam::Mat4,
-        _display: &glium::Display,
+        _display: &Display<WindowSurface>,
         _target: &mut glium::framebuffer::SimpleFrameBuffer,
     ) {
     }
@@ -191,41 +192,6 @@ impl Object for NavigationGround {
                 self.set_rotation(rot, false);
             }
         }
-    }
-
-    fn update_children(&mut self) {
-        let global_transform = self.global_transform();
-
-        self.children_list_mut().iter_mut().for_each(|child| {
-            child.set_parent_transform(global_transform);
-            child.update();
-            child.update_children();
-        });
-    }
-
-    fn render_children(
-        &mut self,
-        display: &glium::Display,
-        target: &mut glium::Frame,
-        cascades: &crate::managers::render::Cascades,
-        shadow_texture: &crate::managers::render::ShadowTextures,
-    ) {
-        self.children_list_mut().iter_mut().for_each(|child| {
-            child.render(display, target, cascades, shadow_texture);
-            child.render_children(display, target, cascades, shadow_texture);
-        });
-    }
-
-    fn shadow_render_children(
-        &mut self,
-        view_proj: &glam::Mat4,
-        display: &glium::Display,
-        target: &mut glium::framebuffer::SimpleFrameBuffer,
-    ) {
-        self.children_list_mut().iter_mut().for_each(|child| {
-            child.shadow_render(&view_proj, display, target);
-            child.shadow_render_children(&view_proj, display, target);
-        });
     }
 
     fn debug_render(&self) {

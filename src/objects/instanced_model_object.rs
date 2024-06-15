@@ -1,11 +1,11 @@
 use super::{gen_object_id, Object, ObjectGroup, Transform};
-use crate::{managers::{
+use crate::{framework::Framework, managers::{
     physics::ObjectBodyParameters,
     render::{self, Cascades, ShadowTextures},
 }, math_utils::deg_vec_to_rad};
 use glam::{Mat4, Quat};
 use glium::{
-    framebuffer::SimpleFrameBuffer, Display
+    framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, Display
 };
 
 #[derive(Debug)]
@@ -69,7 +69,7 @@ impl InstancedModelObject {
 impl Object for InstancedModelObject {
     fn start(&mut self) {}
 
-    fn update(&mut self) {
+    fn update(&mut self, _: &mut Framework) {
         render::add_instance_position(&self.instance, self.setup_mat());
     }
 
@@ -130,9 +130,9 @@ impl Object for InstancedModelObject {
         &mut self.groups
     }
 
-    fn render(&mut self, _: &Display, _: &mut glium::Frame, _: &Cascades, _: &ShadowTextures) {}
+    fn render(&mut self, _: &Display<WindowSurface>, _: &mut glium::Frame, _: &Cascades, _: &ShadowTextures) {}
 
-    fn shadow_render(&mut self, _: &Mat4, _: &Display, _: &mut SimpleFrameBuffer) {}
+    fn shadow_render(&mut self, _: &Mat4, _: &Display<WindowSurface>, _: &mut SimpleFrameBuffer) {}
 }
 
 #[derive(Debug)]

@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use crate::math_utils::deg_to_rad;
 use glam::{Mat4, Quat, Vec3, Vec4};
 use glium::{
-    framebuffer::SimpleFrameBuffer, implement_vertex, index::PrimitiveType,
-    texture::DepthTexture2d, uniform, Display, Frame, IndexBuffer, Program, Surface, VertexBuffer,
+    framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex, index::PrimitiveType, texture::DepthTexture2d, uniform, Display, Frame, IndexBuffer, Program, Surface, VertexBuffer
 };
 use once_cell::sync::Lazy;
 
@@ -23,7 +22,7 @@ pub struct Vertex {
 }
 implement_vertex!(Vertex, position, normal, tex_coords, joints, weights);
 
-pub fn init(display: &Display) {
+pub fn init(display: &Display<WindowSurface>) {
     unsafe {
         COLLIDER_CUBOID_VERTEX_BUFFER = Some(VertexBuffer::new(display, &CUBE_VERTS_LIST).unwrap());
         COLLIDER_CUBOID_INDEX_BUFFER = Some(
@@ -51,7 +50,7 @@ pub fn init(display: &Display) {
 }
 
 /// Call only after drawing everything.
-pub fn debug_draw(display: &Display, target: &mut Frame) {
+pub fn debug_draw(display: &Display<WindowSurface>, target: &mut Frame) {
     let proj = get_projection_matrix().to_cols_array_2d();
     let view = get_view_matrix().to_cols_array_2d();
 
@@ -226,18 +225,18 @@ pub fn add_ray_to_draw(ray: RenderRay) {
     }
 }
 
-pub fn draw(display: &Display, target: &mut Frame, shadow_textures: &ShadowTextures) {
+pub fn draw(display: &Display<WindowSurface>, target: &mut Frame, shadow_textures: &ShadowTextures) {
     //target.clear_color_and_depth((0.6, 0.91, 0.88, 1.0), 1.0);
     target.clear_color_srgb_and_depth((0.7, 0.7, 0.9, 1.0), 1.0);
 
     let mut closest_shadow_fbo =
         SimpleFrameBuffer::depth_only(display, &shadow_textures.closest).unwrap();
-    closest_shadow_fbo.clear_color(1.0, 1.0, 1.0, 1.0);
+    closest_shadow_fbo.clear_color_srgb(1.0, 1.0, 1.0, 1.0);
     closest_shadow_fbo.clear_depth(1.0);
 
     let mut furthest_shadow_fbo =
         SimpleFrameBuffer::depth_only(display, &shadow_textures.furthest).unwrap();
-    furthest_shadow_fbo.clear_color(1.0, 1.0, 1.0, 1.0);
+    furthest_shadow_fbo.clear_color_srgb(1.0, 1.0, 1.0, 1.0);
     furthest_shadow_fbo.clear_depth(1.0);
 
     let view = get_view_matrix();
@@ -328,8 +327,6 @@ pub fn get_light_direction() -> Vec3 {
 pub fn get_view_matrix() -> Mat4 {
     unsafe {
         let mut camera_position = CAMERA_LOCATION.position.clone();
-        //camera_position.x = -camera_position.x;
-        //let old_x = camera_position.x;
         camera_position.x = -camera_position.x;
         camera_position.z = -camera_position.z;
         Mat4::look_at_lh(
@@ -640,7 +637,7 @@ impl SunCamera {
             corners.max_y + 50.0,
             corners.min_z - 100.0,
             //corners.min_z + corners.max_z / 2.0,
-            corners.max_z + 100.0,
+            corners.max_z + 200.0,
         )
     }
 
@@ -739,9 +736,9 @@ impl CameraCorners {
         }
     }
 
-    pub fn get_sun_eye(&self) -> Vec3 {
+    /*pub fn get_sun_eye(&self) -> Vec3 {
         Vec3::new(self.min_x, self.max_y, self.min_z)
-    }
+    }*/
 
     pub fn new(start_distance: f32, end_distance: Option<f32>, view: Mat4) -> CameraCorners {
         let corners =
@@ -804,7 +801,7 @@ pub struct ShadowTextures {
 }
 
 impl ShadowTextures {
-    pub fn new(display: &Display, closest_size: u32, furthest_size: u32) -> ShadowTextures {
+    pub fn new(display: &Display<WindowSurface>, closest_size: u32, furthest_size: u32) -> ShadowTextures {
         let closest =
             glium::texture::DepthTexture2d::empty(display, closest_size, closest_size).unwrap(); // 1st Cascade
         let furthest =

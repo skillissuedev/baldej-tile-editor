@@ -1,12 +1,13 @@
 use super::System;
 use crate::{
-    assets::{model_asset::ModelAsset, shader_asset::{ShaderAsset, ShaderAssetPath}, texture_asset::TextureAsset}, framework::{get_delta_time, get_resolution}, managers::{
+    assets::{model_asset::ModelAsset, shader_asset::{ShaderAsset, ShaderAssetPath}, texture_asset::TextureAsset}, framework::{get_delta_time, get_resolution, Framework}, managers::{
         input::{self, is_mouse_locked, set_mouse_locked, InputEventType}, networking::Message, physics::{BodyColliderType, BodyType}, render::{get_camera_front, get_camera_position, get_camera_right, get_camera_rotation, set_camera_position, set_camera_rotation, set_light_direction}, systems::{CallList, SystemValue}
     }, objects::{instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, ray::Ray, Object, Transform}
 };
 use egui_glium::egui_winit::egui::{Color32, ComboBox, Pos2, ScrollArea, TextEdit, Vec2, Window};
 use glam::Vec3;
 use rand::{thread_rng, Rng};
+use winit::{event::MouseButton, keyboard::KeyCode};
 
 #[derive(Debug)]
 struct Prop {
@@ -225,12 +226,7 @@ impl System for MainSystem {
             }
             generated_code.push_str(&spawn_tile_client);
             generated_code.push_str(&spawn_tile_server);
-            ui.horizontal(|ui| {
-                ui.heading("generated code:");
-                if ui.button("copy").clicked() {
-                    ui.output().copied_text = generated_code.clone();
-                };
-            });            
+            ui.heading("generated code:");
             ScrollArea::vertical().show(ui, |ui| {
                 ui.add(TextEdit::multiline(&mut generated_code).code_editor().desired_rows(20).desired_width(f32::INFINITY));
             });
@@ -396,7 +392,7 @@ impl System for MainSystem {
         });
     }
 
-    fn client_start(&mut self) {
+    fn client_start(&mut self, _: &mut Framework) {
         let ray = Ray::new("ray", Vec3::new(0.0, 0.0, 900.0), None);
         self.add_object(Box::new(ray));
 
@@ -407,53 +403,53 @@ impl System for MainSystem {
         set_camera_position(Vec3::new(0.0, 0.0, 0.0));
         input::new_bind(
             "slower",
-            vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::LShift)],
+            vec![InputEventType::Key(KeyCode::ShiftLeft)],
         );
         input::new_bind(
             "forward",
-            vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::W)],
+            vec![InputEventType::Key(KeyCode::KeyW)],
         );
         input::new_bind(
             "left",
-            vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::A)],
+            vec![InputEventType::Key(KeyCode::KeyA)],
         );
         input::new_bind(
             "backwards",
-            vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::S)],
+            vec![InputEventType::Key(KeyCode::KeyS)],
         );
         input::new_bind(
             "right",
-            vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::D)],
+            vec![InputEventType::Key(KeyCode::KeyD)],
         );
         input::new_bind(
             "cam_up",
-            vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::Q)],
+            vec![InputEventType::Key(KeyCode::KeyQ)],
         );
         input::new_bind(
             "cam_down",
-            vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::E)],
+            vec![InputEventType::Key(KeyCode::KeyE)],
         );
         input::new_bind(
             "lock_mouse",
-            vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::L)],
+            vec![InputEventType::Key(KeyCode::KeyL)],
         );
         input::new_bind(
             "undo",
-            vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::Z)],
+            vec![InputEventType::Key(KeyCode::KeyZ)],
         );
         input::new_bind(
             "place_prop",
             vec![
-                InputEventType::Key(glium::glutin::event::VirtualKeyCode::Return),
-                InputEventType::Mouse(glium::glutin::event::MouseButton::Right)
+                InputEventType::Key(KeyCode::Enter),
+                InputEventType::Mouse(MouseButton::Left)
             ],
         );
     }
 
-    fn server_start(&mut self) {}
+    fn server_start(&mut self, _: &mut Framework) {}
     fn server_render(&mut self) {}
 
-    fn client_update(&mut self) {
+    fn client_update(&mut self, _: &mut Framework) {
         set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
 
         //locking mouse
@@ -597,7 +593,7 @@ impl System for MainSystem {
         }
     }
 
-    fn server_update(&mut self) {}
+    fn server_update(&mut self, _: &mut Framework) {}
 
     fn client_render(&mut self) {}
 

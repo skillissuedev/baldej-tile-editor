@@ -1,5 +1,5 @@
 use crate::{
-    framework::{self, DebugMode},
+    framework::{self, DebugMode, Framework},
     managers::{
         self, debugger,
         physics::{
@@ -9,9 +9,8 @@ use crate::{
         render,
         ui::Vec3Inspector,
     },
-    math_utils::deg_vec_to_rad,
 };
-use glam::{Mat4, Quat, Vec3, Vec4};
+use glam::Vec3;
 use rapier3d::{geometry::InteractionGroups, pipeline::QueryFilter};
 
 use super::{gen_object_id, Object, ObjectGroup, Transform};
@@ -53,7 +52,7 @@ impl Ray {
 impl Object for Ray {
     fn start(&mut self) {}
 
-    fn update(&mut self) {}
+    fn update(&mut self, _: &mut Framework) {}
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
         &self.children
